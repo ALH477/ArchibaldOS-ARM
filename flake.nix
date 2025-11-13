@@ -1,8 +1,8 @@
 {
-  description = "Lean RT Audio ArchibaldOS: Minimal Oligarchy NixOS variant for real-time audio with Musnix, Plasma KDE (ARM64 version)";
+  description = "Lean RT Audio ArchibaldOS: Minimal Oligarchy NixOS variant for real-time audio with Musnix, Plasma KDE (with ARM64 support)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";  # Updated to unstable for latest package support
     musnix.url = "github:musnix/musnix";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
@@ -16,7 +16,8 @@
       config.allowUnfree = true;
     };
     pkgs-arm = import nixpkgs {
-      system = system-arm;
+      localSystem = system-x86;  # Build on x86_64
+      crossSystem = system-arm;  # Target aarch64
       config.allowUnfree = true;
     };
 
@@ -24,7 +25,7 @@
 
   in {
     nixosConfigurations = {
-      # Original x86 configuration (unchanged)
+      # Original x86 configuration (unchanged, using CD ISO)
       archibaldOS = nixpkgs.lib.nixosSystem {
         system = system-x86;
         modules = [
@@ -35,21 +36,17 @@
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
-            nixpkgs.config.permittedInsecurePackages = [ "qtwebengine-5.15.19" ]; # Allow insecure qtwebengine for build
+            nixpkgs.config.permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
 
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
-              dialog disko mkpasswd networkmanager # For partitioning and utils
+              dialog disko mkpasswd networkmanager
             ];
 
             hardware.graphics.enable = true;
             hardware.graphics.extraPackages = with pkgs; [
-              mesa
-              vaapiIntel
-              vaapiVdpau
-              libvdpau-va-gl
-              intel-media-driver  # For Intel GPUs
-              # amdvlk  # Uncomment for AMD GPUs
+              mesa vaapiIntel vaapiVdpau libvdpau-va-gl intel-media-driver
+              # amdvlk
             ];
             isoImage.squashfsCompression = "gzip -Xcompression-level 1";
             nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -59,7 +56,6 @@
               asciiArt = true;
               splash = true;
               wallpaper = true;
-              # waybarIcons = true;  # Removed: Waybar is Hyprland-specific
             };
 
             users.users.nixos = {
@@ -70,7 +66,6 @@
               shell = lib.mkForce pkgs.bashInteractive;
             };
 
-            # Override audio-user as a minimal system user in live ISO (hides from SDDM, satisfies assertions)
             users.users.audio-user = lib.mkForce {
               isSystemUser = true;
               group = "audio-user";
@@ -78,16 +73,13 @@
             };
             users.groups.audio-user = {};
 
-            # Autologin to nixos user (Plasma session in live)
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "nixos";
 
-            # Ensure SDDM hides audio-user explicitly (redundant but safe)
             services.displayManager.sddm.settings = {
               Users.HideUsers = "audio-user";
             };
 
-            # Optional: Create screenshot directory (harmless for Plasma)
             system.activationScripts.mkdirScreenshots = {
               text = ''
                 mkdir -p /home/nixos/Pictures/Screenshots
@@ -95,7 +87,7 @@
               '';
             };
 
-            # Optional NVIDIA support (uncomment if needed)
+            # Optional NVIDIA
             # hardware.nvidia.modesetting.enable = true;
             # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable;
             # boot.kernelParams = [ "nvidia-drm.modeset=1" ];
@@ -103,37 +95,36 @@
         ];
       };
 
-      # New ARM64 configuration
+      # ARM64 configuration (using SD image for SBCs)
       archibaldOS-arm = nixpkgs.lib.nixosSystem {
-        system = system-arm;
+        pkgs = pkgs-arm;  # Use cross-compiled pkgs
         modules = [
-          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix"
+          "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
           musnix.nixosModules.musnix
-          ./modules/audio.nix  # Use the modified audio.nix below
+          ./modules/audio.nix
           ./modules/desktop.nix
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
-            nixpkgs.config.permittedInsecurePackages = [ "qtwebengine-5.15.19" ]; # Allow insecure qtwebengine for build if needed
+            nixpkgs.config.permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
 
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
-              dialog disko mkpasswd networkmanager # For partitioning and utils
+              dialog disko mkpasswd networkmanager
             ];
 
             hardware.graphics.enable = true;
             hardware.graphics.extraPackages = with pkgs; [
-              mesa  # Generic for ARM64 (e.g., Broadcom, Mali, etc.)
+              mesa
             ];
-            isoImage.squashfsCompression = "gzip -Xcompression-level 1";
+
             nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
             branding = {
               enable = true;
               asciiArt = true;
-              splash = true;
+              splash = true;  # May not work on all ARM; test
               wallpaper = true;
-              # waybarIcons = true;  # Removed: Waybar is Hyprland-specific
             };
 
             users.users.nixos = {
@@ -144,7 +135,6 @@
               shell = lib.mkForce pkgs.bashInteractive;
             };
 
-            # Override audio-user as a minimal system user in live ISO (hides from SDDM, satisfies assertions)
             users.users.audio-user = lib.mkForce {
               isSystemUser = true;
               group = "audio-user";
@@ -152,16 +142,13 @@
             };
             users.groups.audio-user = {};
 
-            # Autologin to nixos user (Plasma session in live)
             services.displayManager.autoLogin.enable = true;
             services.displayManager.autoLogin.user = "nixos";
 
-            # Ensure SDDM hides audio-user explicitly (redundant but safe)
             services.displayManager.sddm.settings = {
               Users.HideUsers = "audio-user";
             };
 
-            # Optional: Create screenshot directory (harmless for Plasma)
             system.activationScripts.mkdirScreenshots = {
               text = ''
                 mkdir -p /home/nixos/Pictures/Screenshots
@@ -169,23 +156,28 @@
               '';
             };
 
-            # Optional NVIDIA support for ARM64 (e.g., Jetson; uncomment if needed)
+            # Optional NVIDIA for ARM (Jetson)
             # hardware.nvidia.modesetting.enable = true;
             # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable;
             # boot.kernelParams = [ "nvidia-drm.modeset=1" ];
+
+            # ARM-specific tweaks (e.g., for Raspberry Pi; uncomment if targeting specific board)
+            # boot.loader.raspberryPi.enable = true;
+            # boot.loader.raspberryPi.version = 4;  # For Pi 4/5
+            # boot.kernelPackages = pkgs.linuxPackages_rpi4;
           })
         ];
       };
     };
 
     packages.${system-x86}.installer = self.nixosConfigurations.archibaldOS.config.system.build.isoImage;
-    packages.${system-arm}.installer-arm = self.nixosConfigurations.archibaldOS-arm.config.system.build.isoImage;
+    packages.${system-x86}.installer-arm = self.nixosConfigurations.archibaldOS-arm.config.system.build.sdImage;  # Build on x86 for ARM target
 
     devShells.${system-arm}.default = pkgs-arm.mkShell {
       packages = with pkgs-arm; [
         audacity fluidsynth musescore guitarix
         csound faust portaudio rtaudio supercollider qjackctl
-        surge
+        surge  # Assuming updated nixpkgs
         pcmanfm vim
       ];
     };
