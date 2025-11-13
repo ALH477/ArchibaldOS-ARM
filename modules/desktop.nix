@@ -2,7 +2,7 @@
   basicPackages = with pkgs; [
     vim kitty wireplumber cava playerctl
     jetbrains-mono
-    noto-fonts-emoji
+    noto-fonts-color-emoji  # Updated from noto-fonts-emoji
   ];
 in {
   services.xserver.enable = true;
