@@ -99,10 +99,10 @@ DeMoD LLC
           '';
           mode = "0755";
         };
-        "gnome/backgrounds/archibaldos" = lib.mkIf config.services.desktopManager.gnome.enable {  # Updated from services.xserver.desktopManager.gnome.enable
+        "gnome/backgrounds/archibaldos" = lib.mkIf config.services.desktopManager.gnome.enable {
           source = "/usr/share/wallpapers/ArchibaldOS";
         };
-        "xfce4/backdrops/archibaldos" = lib.mkIf config.services.desktopManager.xfce.enable {  # Updated from services.xserver.desktopManager.xfce.enable
+        "xfce4/backdrops/archibaldos" = lib.mkIf config.services.xserver.desktopManager.xfce.enable {
           source = "/usr/share/wallpapers/ArchibaldOS";
         };
         # Add similar entries for other DEs (e.g., Cinnamon, MATE) as needed
