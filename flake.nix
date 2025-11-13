@@ -13,12 +13,18 @@
     system-arm = "aarch64-linux";
     pkgs-x86 = import nixpkgs {
       system = system-x86;
-      config.allowUnfree = true;
+      config = {
+        allowUnfree = true;
+        permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
+      };
     };
     pkgs-arm = import nixpkgs {
       localSystem = system-x86;
       crossSystem = system-arm;
-      config.allowUnfree = true;
+      config = {
+        allowUnfree = true;
+        permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
+      };
     };
 
     wallpaperSrc = ./modules/assets/wallpaper.jpg;
@@ -35,8 +41,6 @@
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
-            nixpkgs.config.permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
-
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
               dialog disko mkpasswd networkmanager
@@ -104,8 +108,6 @@
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
-            nixpkgs.config.permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
-
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
               dialog disko mkpasswd networkmanager
@@ -159,7 +161,7 @@
             # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable;
             # boot.kernelParams = [ "nvidia-drm.modeset=1" ];
 
-            # Example for Raspberry Pi (uncomment and adjust)
+            # Example for Raspberry Pi
             # boot.loader.raspberryPi.enable = true;
             # boot.loader.raspberryPi.version = 4;
             # boot.kernelPackages = pkgs.linuxPackages_rpi4;
@@ -179,7 +181,7 @@
       packages = with pkgs-arm; [
         audacity fluidsynth musescore guitarix
         csound faust portaudio rtaudio supercollider qjackctl
-        surge-XT  # Updated package name for ARM support
+        surge-XT
         pcmanfm vim
       ];
     };
