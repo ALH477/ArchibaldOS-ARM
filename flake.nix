@@ -24,7 +24,7 @@
       config = {
         allowUnfree = true;
         permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
-        allowUnsupportedSystem = true;  # Override for packages like surge-XT
+        allowUnsupportedSystem = true;
       };
     };
 
@@ -42,7 +42,7 @@
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
-            system.stateVersion = "25.11";  # Silence warning
+            system.stateVersion = "25.11";
 
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
@@ -102,7 +102,15 @@
       };
 
       archibaldOS-arm = nixpkgs.lib.nixosSystem {
-        pkgs = pkgs-arm;
+        pkgs = pkgs-arm.override {
+          overlays = [
+            (self: super: {
+              discount = super.discount.overrideAttrs (old: {
+                configureFlags = lib.filter (f => !lib.hasPrefix "--build=" f) (old.configureFlags or []);
+              });
+            })
+          ];
+        };
         modules = [
           "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
           musnix.nixosModules.musnix
@@ -111,7 +119,7 @@
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
-            system.stateVersion = "25.11";  # Silence warning
+            system.stateVersion = "25.11";
 
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
