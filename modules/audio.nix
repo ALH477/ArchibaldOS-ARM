@@ -4,7 +4,7 @@ let
   audioPackages = with pkgs; [
     audacity fluidsynth musescore guitarix
     csound csound-qt faust portaudio rtaudio supercollider qjackctl
-    surge zrythm carla puredata cardinal helm zynaddsubfx vmpk qmidinet 
+    surge-XT zrythm carla puredata cardinal helm zynaddsubfx vmpk qmidinet 
     faust2alsa faust2csound faust2jack dragonfly-reverb calf
   ];
 in {
@@ -34,7 +34,6 @@ in {
 
   security.rtkit.enable = true;
 
-  # Set real-time limits for audio group
   security.pam.loginLimits = [
     { domain = "@audio"; item = "rtprio"; type = "-"; value = 95; }
     { domain = "@audio"; item = "memlock"; type = "-"; value = "unlimited"; }
@@ -45,8 +44,8 @@ in {
 
   boot.kernelParams = [
     "threadirqs"
-    "isolcpus=1-3"  # Adjust for your ARM SoC's core count (e.g., remove if <4 cores)
-    "nohz_full=1-3"  # Adjust similarly
+    "isolcpus=1-3"
+    "nohz_full=1-3"
   ];
 
   boot.kernel.sysctl = {
@@ -56,7 +55,6 @@ in {
 
   environment.etc."sysctl.d/99-audio.conf".text = ''
     dev.rtc.max-user-freq = 2048
-    # HPET omitted as it's x86-specific
   '';
 
   powerManagement.cpuFreqGovernor = "performance";
