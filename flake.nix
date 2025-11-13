@@ -24,6 +24,7 @@
       config = {
         allowUnfree = true;
         permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
+        allowUnsupportedSystem = true;  # Override for packages like surge-XT
       };
     };
 
@@ -41,6 +42,8 @@
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
+            system.stateVersion = "25.11";  # Silence warning
+
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
               dialog disko mkpasswd networkmanager
@@ -108,6 +111,8 @@
           ./modules/users.nix
           ./modules/branding.nix
           ({ config, pkgs, lib, ... }: {
+            system.stateVersion = "25.11";  # Silence warning
+
             environment.systemPackages = with pkgs; [
               usbutils libusb1 alsa-firmware alsa-tools
               dialog disko mkpasswd networkmanager
