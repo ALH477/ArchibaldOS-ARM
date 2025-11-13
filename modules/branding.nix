@@ -8,7 +8,8 @@
     };
     splash = lib.mkEnableOption "Plymouth boot splash with DeMoD logo";
     wallpaper = lib.mkEnableOption "DeMoD-branded wallpaper (DEPRECATED: use wallpapers)";
-    wallpapers = lib.types.bool;
+    wallpapers = lib.mkOption {
+      type = lib.types.bool;
       default = true;
       description = "Enable system-wide wallpaper placement for multiple DEs/WMs";
     };
@@ -20,7 +21,7 @@
   };
 
   config = lib.mkIf config.branding.enable {
-    # === 2. Plymouth Splash (x86 only) ===
+    # === 2. Plymouth Splash ===
     boot.plymouth = lib.mkIf (config.branding.splash && pkgs.stdenv.hostPlatform.isx86) {
       enable = true;
       themePackages = [ (pkgs.runCommand "demod-plymouth" {} ''
@@ -98,13 +99,13 @@ DeMoD LLC
           '';
           mode = "0755";
         };
-        "gnome/backgrounds/archibaldos" = lib.mkIf config.services.xserver.desktopManager.gnome.enable {
+        "gnome/backgrounds/archibaldos" = lib.mkIf config.services.desktopManager.gnome.enable {  # Updated from services.xserver.desktopManager.gnome.enable
           source = "/usr/share/wallpapers/ArchibaldOS";
         };
-        "xfce4/backdrops/archibaldos" = lib.mkIf config.services.xserver.desktopManager.xfce.enable {
+        "xfce4/backdrops/archibaldos" = lib.mkIf config.services.desktopManager.xfce.enable {  # Updated from services.xserver.desktopManager.xfce.enable
           source = "/usr/share/wallpapers/ArchibaldOS";
         };
-        # Add similar entries for other DEs as needed
+        # Add similar entries for other DEs (e.g., Cinnamon, MATE) as needed
       })
     ];
 
@@ -119,7 +120,7 @@ DeMoD LLC
           fi
         done
       '';
-      deps = [ "users" ];
+      deps = [ "users" ];  # Run after user creation
     };
   };
 }
