@@ -106,7 +106,7 @@
           overlays = [
             (self: super: {
               discount = super.discount.overrideAttrs (old: {
-                configureFlags = lib.filter (f => !lib.hasPrefix "--build=" f) (old.configureFlags or []);
+                configureFlags = lib.filter (f : !lib.hasPrefix "--build=" f) (old.configureFlags or []);
               });
             })
           ];
