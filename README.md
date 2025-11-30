@@ -234,10 +234,10 @@ copies of the Software...
 
 ## Contact & Support
 
-- **Website:** https://demod.dev  
+- **Website:** https://demod.ltd
 - **Issues:** https://github.com/DeMoD-LLC/archibaldos-arm/issues  
 - **Discussions:** https://github.com/DeMoD-LLC/archibaldos-arm/discussions
-- **Commercial support & custom builds:** contact@demod.dev  
+- **Commercial support & custom builds:** contact@demod.ltd
 
 ---
 
