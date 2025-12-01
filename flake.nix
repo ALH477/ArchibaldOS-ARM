@@ -1,202 +1,101 @@
 {
-  description = "Lean RT Audio ArchibaldOS: Minimal Oligarchy NixOS variant for real-time audio with Musnix, Plasma KDE (with ARM64 support)";
+  description = "ArchibaldOS ARM Robust – Orange Pi 5";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+
     musnix.url = "github:musnix/musnix";
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
+    musnix.inputs.nixpkgs.follows = "nixpkgs";
+
+    hyprland.url = "github:hyprwm/Hyprland";
+    hyprland.inputs.nixpkgs.follows = "nixpkgs";
+
+    nixos-rk3588.url = "github:gnull/nixos-rk3588";
+    nixos-rk3588.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, musnix, disko }: let
-    system-x86 = "x86_64-linux";
-    system-arm = "aarch64-linux";
-    pkgs-x86 = import nixpkgs {
-      system = system-x86;
-      config = {
-        allowUnfree = true;
-        permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
-      };
-    };
-    pkgs-arm = import nixpkgs {
-      localSystem = system-x86;
-      crossSystem = system-arm;
-      config = {
-        allowUnfree = true;
-        permittedInsecurePackages = [ "qtwebengine-5.15.19" ];
-        allowUnsupportedSystem = true;
-      };
-    };
+  outputs = { self, flake-parts, nixpkgs, ... }@inputs:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" "aarch64-linux" ];
 
-    wallpaperSrc = ./modules/assets/wallpaper.jpg;
+      perSystem = { system, pkgs, ... }: let
+        lib = pkgs.lib;
 
-  in {
-    nixosConfigurations = {
-      archibaldOS = nixpkgs.lib.nixosSystem {
-        system = system-x86;
-        modules = [
-          "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-graphical-calamares-plasma6.nix"
-          musnix.nixosModules.musnix
-          ./modules/audio.nix
-          ./modules/desktop.nix
-          ./modules/users.nix
-          ./modules/branding.nix
-          ({ config, pkgs, lib, ... }: {
-            system.stateVersion = "25.11";
+        board = builtins.getEnv "BOARD";
+        targetBoard = if board != "" then board else "orange-pi-5";
 
-            environment.systemPackages = with pkgs; [
-              usbutils libusb1 alsa-firmware alsa-tools
-              dialog disko mkpasswd networkmanager
+        mkSystem = board: 
+          let
+            # Get the board module name
+            boardName = 
+              if board == "orange-pi-5" then "orangepi5"
+              else if board == "orange-pi-5-plus" then "orangepi5plus"
+              else if board == "orange-pi-5b" then "orangepi5b"
+              else if board == "rock-5a" then "rock5a"
+              else throw "Unsupported board: ${board}";
+            
+            # Get the board module attrset
+            boardModule = inputs.nixos-rk3588.nixosModules.boards.${boardName};
+            
+            # Create pkgs for cross-compilation from x86_64 to aarch64
+            targetPkgs = import inputs.nixpkgs {
+              system = system;  # Build system (x86_64-linux)
+              crossSystem = lib.systems.elaborate "aarch64-linux";
+            };
+          in
+          nixpkgs.lib.nixosSystem {
+            # Target ARM64
+            system = "aarch64-linux";
+            specialArgs = { 
+              inherit inputs board;
+              # Provide the full rk3588 argument that the modules expect
+              rk3588 = {
+                nixpkgs = inputs.nixpkgs;
+                pkgs = targetPkgs;
+                pkgsKernel = targetPkgs;
+              } // inputs.nixos-rk3588.packages.${system};
+            };
+            modules = [
+              # Import the core board configuration
+              boardModule.core
+              
+              # Import the SD image format
+              boardModule.sd-image
+
+              # Enable cross-compilation
+              ({ config, lib, ... }: {
+                nixpkgs.buildPlatform = system;
+                nixpkgs.hostPlatform = "aarch64-linux";
+              })
+
+              ./configuration.nix
+              inputs.musnix.nixosModules.musnix
+              inputs.hyprland.nixosModules.default
+
+              # Load our custom hardware config if it exists
+              (if builtins.pathExists (./hardware + "/${board}.nix")
+               then import (./hardware + "/${board}.nix")
+               else { })
+
+              # Override SD image settings
+              ({ config, lib, ... }: {
+                sdImage = {
+                  imageName = lib.mkForce "archibaldos-${board}.img";
+                  compressImage = lib.mkDefault true;
+                };
+              })
             ];
+          };
 
-            hardware.graphics.enable = true;
-            hardware.graphics.extraPackages = with pkgs; [
-              mesa vaapiIntel vaapiVdpau libvdpau-va-gl intel-media-driver
-              # amdvlk
-            ];
-            isoImage.squashfsCompression = "gzip -Xcompression-level 1";
-            nix.settings.experimental-features = [ "nix-command" "flakes" ];
+        built = mkSystem targetBoard;
 
-            branding = {
-              enable = true;
-              asciiArt = true;
-              splash = true;
-              wallpaper = true;
-            };
-
-            users.users.nixos = {
-              initialHashedPassword = lib.mkForce null;
-              home = "/home/nixos";
-              createHome = true;
-              extraGroups = [ "audio" "jackaudio" "video" "networkmanager" ];
-              shell = lib.mkForce pkgs.bashInteractive;
-            };
-
-            users.users.audio-user = lib.mkForce {
-              isSystemUser = true;
-              group = "audio-user";
-              description = "Disabled in live ISO";
-            };
-            users.groups.audio-user = {};
-
-            services.displayManager.autoLogin.enable = true;
-            services.displayManager.autoLogin.user = "nixos";
-
-            services.displayManager.sddm.settings = {
-              Users.HideUsers = "audio-user";
-            };
-
-            system.activationScripts.mkdirScreenshots = {
-              text = ''
-                mkdir -p /home/nixos/Pictures/Screenshots
-                chown nixos:users /home/nixos/Pictures/Screenshots
-              '';
-            };
-
-            # Optional NVIDIA
-            # hardware.nvidia.modesetting.enable = true;
-            # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable;
-            # boot.kernelParams = [ "nvidia-drm.modeset=1" ];
-          })
-        ];
-      };
-
-      archibaldOS-arm = nixpkgs.lib.nixosSystem {
-        pkgs = pkgs-arm.override {
-          overlays = [
-            (self: super: {
-              discount = super.discount.overrideAttrs (old: {
-                configureFlags = lib.filter (f : !lib.hasPrefix "--build=" f) (old.configureFlags or []);
-              });
-            })
-          ];
-        };
-        modules = [
-          "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
-          musnix.nixosModules.musnix
-          ./modules/audio.nix
-          ./modules/desktop.nix
-          ./modules/users.nix
-          ./modules/branding.nix
-          ({ config, pkgs, lib, ... }: {
-            system.stateVersion = "25.11";
-
-            environment.systemPackages = with pkgs; [
-              usbutils libusb1 alsa-firmware alsa-tools
-              dialog disko mkpasswd networkmanager
-            ];
-
-            hardware.graphics.enable = true;
-            hardware.graphics.extraPackages = with pkgs; [
-              mesa
-            ];
-
-            nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-            branding = {
-              enable = true;
-              asciiArt = true;
-              splash = true;
-              wallpaper = true;
-            };
-
-            users.users.nixos = {
-              initialHashedPassword = lib.mkForce null;
-              home = "/home/nixos";
-              createHome = true;
-              extraGroups = [ "audio" "jackaudio" "video" "networkmanager" ];
-              shell = lib.mkForce pkgs.bashInteractive;
-            };
-
-            users.users.audio-user = lib.mkForce {
-              isSystemUser = true;
-              group = "audio-user";
-              description = "Disabled in live ISO";
-            };
-            users.groups.audio-user = {};
-
-            services.displayManager.autoLogin.enable = true;
-            services.displayManager.autoLogin.user = "nixos";
-
-            services.displayManager.sddm.settings = {
-              Users.HideUsers = "audio-user";
-            };
-
-            system.activationScripts.mkdirScreenshots = {
-              text = ''
-                mkdir -p /home/nixos/Pictures/Screenshots
-                chown nixos:users /home/nixos/Pictures/Screenshots
-              '';
-            };
-
-            # Optional NVIDIA for ARM
-            # hardware.nvidia.modesetting.enable = true;
-            # hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.stable;
-            # boot.kernelParams = [ "nvidia-drm.modeset=1" ];
-
-            # Example for Raspberry Pi
-            # boot.loader.raspberryPi.enable = true;
-            # boot.loader.raspberryPi.version = 4;
-            # boot.kernelPackages = pkgs.linuxPackages_rpi4;
-          })
-        ];
+      in {
+        # Main package: SD card image
+        packages.default = built.config.system.build.sdImage;
+        
+        # Also expose the raw system for debugging
+        packages.system = built.config.system.build.toplevel;
       };
     };
-
-    packages = {
-      "${system-x86}" = {
-        installer = self.nixosConfigurations.archibaldOS.config.system.build.isoImage;
-        installer-arm = self.nixosConfigurations.archibaldOS-arm.config.system.build.sdImage;
-      };
-    };
-
-    devShells."${system-arm}".default = pkgs-arm.mkShell {
-      packages = with pkgs-arm; [
-        audacity fluidsynth musescore guitarix
-        csound faust portaudio rtaudio supercollider qjackctl
-        surge-XT
-        pcmanfm vim
-      ];
-    };
-  };
 }
