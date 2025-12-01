@@ -100,3 +100,5 @@ of this software and associated documentation files (the "Software"), ...
 - Commercial support & custom builds: contact@demod.dev  
 
 **ArchibaldOS ARM64 — Professional real-time audio, anywhere ARM64 runs.**
+
+82af124698bc73de0541576faa4c34d35f28dd68c7e04ee272b5ceb589e15eea
